@@ -236,33 +236,3 @@
       font-family: monospace;
       text-align: center;
     }
-
-    /* Block Overlay for URL matches */
-    #word-blocker-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: black;
-      color: white;
-      z-index: 2147483647;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-
-    .block-message {
-      font-size: 2em;
-      font-weight: bold;
-      letter-spacing: 2px;
-    }
-
-    .block-details {
-      margin-top: 20px;
-      color: #999;
-      font-family: monospace;
-    }

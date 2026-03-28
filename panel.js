@@ -167,7 +167,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.get([
       'rawPatterns', 
       'blockTitle', 
-      'blockURL', 
       'redactURLBar', 
       'redactWholePhrase', 
       'redactionChar'
@@ -179,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Load individual settings
       document.getElementById('blockTitle').checked = !!result.blockTitle;
-      document.getElementById('blockURL').checked = !!result.blockURL;
       document.getElementById('redactURLBar').checked = !!result.redactURLBar;
       document.getElementById('redactWholePhrase').checked = !!result.redactWholePhrase;
       document.getElementById('redactionChar').value = result.redactionChar || '█';
@@ -248,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Process settings
     const settings = {
       blockTitle: document.getElementById('blockTitle').checked,
-      blockURL: document.getElementById('blockURL').checked,
       redactURLBar: document.getElementById('redactURLBar').checked,
       redactWholePhrase: document.getElementById('redactWholePhrase').checked,
       redactionChar: document.getElementById('redactionChar').value || '█'

@@ -3,7 +3,6 @@ let blockCount = 0;
 let processedNodes = new WeakSet(); // Keep track of nodes we've processed
 let settings = {
   blockTitle: false,
-  blockURL: false,
   redactURLBar: false,
   redactWholePhrase: false,
   redactionChar: '█'
@@ -114,7 +113,6 @@ const intersectionObserver = new IntersectionObserver((entries) => {
 chrome.storage.sync.get([
   'blockPatterns',
   'blockTitle',
-  'blockURL',
   'redactURLBar',
   'redactWholePhrase',
   'redactionChar'
@@ -123,7 +121,6 @@ chrome.storage.sync.get([
     blockPatterns = result.blockPatterns;
     settings = {
       blockTitle: !!result.blockTitle,
-      blockURL: !!result.blockURL,
       redactURLBar: !!result.redactURLBar,
       redactWholePhrase: !!result.redactWholePhrase,
       redactionChar: result.redactionChar || '█'
@@ -131,12 +128,7 @@ chrome.storage.sync.get([
 
     resetCounter();
 
-    // 1. Check if we should block the entire page
-    if (settings.blockURL) {
-      blockPageIfNeeded();
-    }
-
-    // 2. Redact URL Bar (Experimental)
+    // 1. Redact URL Bar (Experimental)
     if (settings.redactURLBar) {
       const originalPushState = history.pushState;
       const originalReplaceState = history.replaceState;
@@ -234,48 +226,6 @@ function redactTitle() {
   });
   if (modified) {
     document.title = title;
-  }
-}
-
-function blockPageIfNeeded() {
-  const currentURL = window.location.href;
-  let matched = false;
-  let matchedPattern = '';
-
-  blockPatterns.forEach(({pattern}) => {
-    try {
-      const regex = new RegExp(pattern, 'gi');
-      if (regex.test(currentURL)) {
-        matched = true;
-        matchedPattern = pattern;
-      }
-    } catch (e) {}
-  });
-
-  if (matched) {
-    showBlockOverlay(matchedPattern);
-  }
-}
-
-function showBlockOverlay(reason) {
-  // Prevent any further processing
-  intersectionObserver.disconnect();
-  
-  const overlay = document.createElement('div');
-  overlay.id = 'word-blocker-overlay';
-  overlay.innerHTML = `
-    <div class="block-message">█ WORD BLOCKER █</div>
-    <div class="block-details">This page was blocked because the URL contains forbidden content.</div>
-    <div class="block-details">Pattern: ${reason}</div>
-  `;
-  
-  // High priority insert
-  if (document.documentElement) {
-    document.documentElement.appendChild(overlay);
-    // Hide original content
-    if (document.body) {
-      document.body.style.display = 'none';
-    }
   }
 }
 
