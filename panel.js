@@ -164,11 +164,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load existing patterns
   function loadPatterns() {
-    chrome.storage.sync.get(['rawPatterns'], (result) => {
+    chrome.storage.sync.get([
+      'rawPatterns', 
+      'blockTitle', 
+      'blockURL', 
+      'redactURLBar', 
+      'redactWholePhrase', 
+      'redactionChar'
+    ], (result) => {
       if (result.rawPatterns) {
         textarea.value = result.rawPatterns.join('\n');
         updateCategoryView();
       }
+      
+      // Load individual settings
+      document.getElementById('blockTitle').checked = !!result.blockTitle;
+      document.getElementById('blockURL').checked = !!result.blockURL;
+      document.getElementById('redactURLBar').checked = !!result.redactURLBar;
+      document.getElementById('redactWholePhrase').checked = !!result.redactWholePhrase;
+      document.getElementById('redactionChar').value = result.redactionChar || '█';
     });
   }
 
@@ -231,10 +245,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Convert raw patterns to regex patterns with labels
     const blockPatterns = rawPatterns.map(parseBlockPattern);
 
-    // Save both raw patterns and processed patterns
+    // Process settings
+    const settings = {
+      blockTitle: document.getElementById('blockTitle').checked,
+      blockURL: document.getElementById('blockURL').checked,
+      redactURLBar: document.getElementById('redactURLBar').checked,
+      redactWholePhrase: document.getElementById('redactWholePhrase').checked,
+      redactionChar: document.getElementById('redactionChar').value || '█'
+    };
+
+    // Save both raw patterns and processed patterns along with settings
     chrome.storage.sync.set({
       rawPatterns: rawPatterns,
-      blockPatterns: blockPatterns
+      blockPatterns: blockPatterns,
+      ...settings
     }, () => {
       updateCategoryView();
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

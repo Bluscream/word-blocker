@@ -38,6 +38,30 @@
         <button id="exportButton" class="file-input-button export-button">Export
           Rules</button>
       </div>
+
+      <div id="settings" class="settings-section">
+        <p><strong>Settings:</strong></p>
+        <div class="setting-item">
+          <input type="checkbox" id="blockTitle">
+          <label for="blockTitle">Redact tab titles</label>
+        </div>
+        <div class="setting-item">
+          <input type="checkbox" id="blockURL">
+          <label for="blockURL">Block page if URL contains blocked words</label>
+        </div>
+        <div class="setting-item">
+          <input type="checkbox" id="redactURLBar">
+          <label for="redactURLBar" title="Uses history.replaceState. May break site routing or cause 404 on refresh!">Redact URL bar (Experimental) ⚠️</label>
+        </div>
+        <div class="setting-item">
+          <input type="checkbox" id="redactWholePhrase">
+          <label for="redactWholePhrase">Replace whole phrase</label>
+        </div>
+        <div class="setting-item">
+          <label for="redactionChar">Redaction character/string:</label>
+          <input type="text" id="redactionChar" value="█" maxLength="10">
+        </div>
+      </div>
       <button id="saveButton">Save</button>
     </div>
 

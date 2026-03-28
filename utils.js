@@ -29,11 +29,17 @@ function parsePatternString(str) {
   return `\\b${escapeRegExp(str)}\\b`;
 }
 
-function replaceWithBlocks(text, pattern) {
+function replaceWithBlocks(text, pattern, redactionChar = '█', redactWholePhrase = false) {
   try {
     const regex = new RegExp(pattern, 'gi');
     // Only replace if the match is not empty
-    return text.replace(regex, match => match.length > 0 ? '█'.repeat(match.length) : match);
+    return text.replace(regex, match => {
+      if (match.length === 0) return match;
+      if (redactWholePhrase) {
+        return redactionChar;
+      }
+      return redactionChar.repeat(match.length);
+    });
   } catch (e) {
     console.error('Invalid regex pattern:', pattern, e);
     return text;

@@ -1,6 +1,13 @@
 let blockPatterns = [];
 let blockCount = 0;
 let processedNodes = new WeakSet(); // Keep track of nodes we've processed
+let settings = {
+  blockTitle: false,
+  blockURL: false,
+  redactURLBar: false,
+  redactWholePhrase: false,
+  redactionChar: '█'
+};
 
 function updateBadgeCount() {
   chrome.runtime.sendMessage({
@@ -9,19 +16,23 @@ function updateBadgeCount() {
   });
 }
 
-function replaceWithBlocks(text, pattern) {
-  try {
-    const regex = new RegExp(pattern, 'gi');
-    const matches = text.match(regex);
-    if (matches) {
-      blockCount += matches.length;
-      updateBadgeCount();
-    }
-    return text.replace(regex, match => '█'.repeat(match.length));
-  } catch (e) {
-    console.error('Invalid regex pattern:', pattern, e);
-    return text;
+// Removed local replaceWithBlocks to use the one from utils.js
+function getRedactedText(text, pattern) {
+  const oldText = text;
+  const newText = replaceWithBlocks(text, pattern, settings.redactionChar, settings.redactWholePhrase);
+  
+  if (newText !== oldText) {
+    // Count matches for badge
+    try {
+      const regex = new RegExp(pattern, 'gi');
+      const matches = oldText.match(regex);
+      if (matches) {
+        blockCount += matches.length;
+        updateBadgeCount();
+      }
+    } catch (e) {}
   }
+  return newText;
 }
 
 function processTextNode(node) {
@@ -31,7 +42,7 @@ function processTextNode(node) {
   let modified = false;
 
   blockPatterns.forEach(({pattern}) => {
-    const newText = replaceWithBlocks(text, pattern);
+    const newText = getRedactedText(text, pattern);
     if (newText !== text) {
       text = newText;
       modified = true;
@@ -100,39 +111,173 @@ const intersectionObserver = new IntersectionObserver((entries) => {
 });
 
 // Initialize
-chrome.storage.sync.get(['blockPatterns'], (result) => {
+chrome.storage.sync.get([
+  'blockPatterns',
+  'blockTitle',
+  'blockURL',
+  'redactURLBar',
+  'redactWholePhrase',
+  'redactionChar'
+], (result) => {
   if (result.blockPatterns) {
     blockPatterns = result.blockPatterns;
+    settings = {
+      blockTitle: !!result.blockTitle,
+      blockURL: !!result.blockURL,
+      redactURLBar: !!result.redactURLBar,
+      redactWholePhrase: !!result.redactWholePhrase,
+      redactionChar: result.redactionChar || '█'
+    };
+
     resetCounter();
 
-    // Observe all existing elements
-    const elements = document.body.getElementsByTagName('*');
-    for (const element of elements) {
-      intersectionObserver.observe(element);
+    // 1. Check if we should block the entire page
+    if (settings.blockURL) {
+      blockPageIfNeeded();
     }
 
-    // Observe new elements being added to the body
-    const bodyObserver = new MutationObserver((mutations) => {
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            intersectionObserver.observe(node);
-            // Also observe any elements within this new node
-            const childElements = node.getElementsByTagName('*');
-            for (const element of childElements) {
-              intersectionObserver.observe(element);
-            }
+    // 2. Redact URL Bar (Experimental)
+    if (settings.redactURLBar) {
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      
+      const performRedaction = () => {
+        const url = new URL(window.location.href);
+        let newPath = url.pathname;
+        let newSearch = url.search;
+        let newHash = url.hash;
+
+        let modified = false;
+        blockPatterns.forEach(({pattern}) => {
+          const redactedPath = getRedactedText(newPath, pattern);
+          const redactedSearch = getRedactedText(newSearch, pattern);
+          const redactedHash = getRedactedText(newHash, pattern);
+
+          if (redactedPath !== newPath || redactedSearch !== newSearch || redactedHash !== newHash) {
+            newPath = redactedPath;
+            newSearch = redactedSearch;
+            newHash = redactedHash;
+            modified = true;
           }
         });
-      });
-    });
 
-    bodyObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+        if (modified) {
+          const newURL = url.origin + newPath + newSearch + newHash;
+          originalReplaceState.call(history, null, '', newURL);
+        }
+      };
+
+      performRedaction();
+      
+      window.addEventListener('popstate', performRedaction);
+      history.pushState = function() {
+        originalPushState.apply(this, arguments);
+        performRedaction();
+      };
+      history.replaceState = function() {
+        originalReplaceState.apply(this, arguments);
+        performRedaction();
+      };
+    }
+
+    // 3. Redact Title
+    if (settings.blockTitle) {
+      redactTitle();
+      // Observe title changes
+      const titleElem = document.querySelector('title');
+      if (titleElem) {
+        const titleObserver = new MutationObserver(() => redactTitle());
+        titleObserver.observe(titleElem, { childList: true });
+      }
+    }
+
+    // 4. Regular content redaction
+    if (document.body) {
+      // Observe all existing elements
+      const elements = document.body.getElementsByTagName('*');
+      for (const element of elements) {
+        intersectionObserver.observe(element);
+      }
+
+      // Observe new elements being added to the body
+      const bodyObserver = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              intersectionObserver.observe(node);
+              const childElements = node.getElementsByTagName('*');
+              for (const element of childElements) {
+                intersectionObserver.observe(element);
+              }
+            }
+          });
+        });
+      });
+
+      bodyObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
   }
 });
+
+function redactTitle() {
+  let title = document.title;
+  let modified = false;
+  blockPatterns.forEach(({pattern}) => {
+    const newTitle = getRedactedText(title, pattern);
+    if (newTitle !== title) {
+      title = newTitle;
+      modified = true;
+    }
+  });
+  if (modified) {
+    document.title = title;
+  }
+}
+
+function blockPageIfNeeded() {
+  const currentURL = window.location.href;
+  let matched = false;
+  let matchedPattern = '';
+
+  blockPatterns.forEach(({pattern}) => {
+    try {
+      const regex = new RegExp(pattern, 'gi');
+      if (regex.test(currentURL)) {
+        matched = true;
+        matchedPattern = pattern;
+      }
+    } catch (e) {}
+  });
+
+  if (matched) {
+    showBlockOverlay(matchedPattern);
+  }
+}
+
+function showBlockOverlay(reason) {
+  // Prevent any further processing
+  intersectionObserver.disconnect();
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'word-blocker-overlay';
+  overlay.innerHTML = `
+    <div class="block-message">█ WORD BLOCKER █</div>
+    <div class="block-details">This page was blocked because the URL contains forbidden content.</div>
+    <div class="block-details">Pattern: ${reason}</div>
+  `;
+  
+  // High priority insert
+  if (document.documentElement) {
+    document.documentElement.appendChild(overlay);
+    // Hide original content
+    if (document.body) {
+      document.body.style.display = 'none';
+    }
+  }
+}
 
 // Handle visibility changes
 document.addEventListener('visibilitychange', () => {
